@@ -20,9 +20,15 @@ RUN git clone https://github.com/Tencent/MimicMotion.git /app/MimicMotion
 
 WORKDIR /app/MimicMotion
 
-# 2. Build the environment using MimicMotion's official environment specification
+# 2. Update conda base environment and install all required runtime dependencies
 RUN conda env update -n base -f environment.yaml && \
-    pip install --no-cache-dir runpod requests matplotlib
+    pip install --no-cache-dir \
+        runpod \
+        requests \
+        matplotlib \
+        opencv-python-headless \
+        onnxruntime-gpu \
+        accelerate
 
 # 3. Download DWPose weights (~300MB total)
 RUN mkdir -p models/DWPose && \
@@ -36,10 +42,21 @@ RUN wget -q https://huggingface.co/tencent/MimicMotion/resolve/main/MimicMotion_
 RUN mkdir -p models/SVD && \
     wget -q https://huggingface.co/vdo/stable-video-diffusion-img2vid-xt-1-1/resolve/main/unet/diffusion_pytorch_model.fp16.safetensors -O models/SVD/diffusion_pytorch_model.fp16.safetensors
 
-# 6. Verify pipeline imports inside the build stage
-RUN python -c "import numpy; import torch; from mimicmotion.utils.loader import create_pipeline; print('Environment and imports verified successfully!')"
+# 6. HARD CHECK: Import EVERY submodule used by the pipeline to guarantee a clean runtime
+RUN python -c "\
+import numpy; \
+import torch; \
+import cv2; \
+import matplotlib; \
+import onnxruntime; \
+import accelerate; \
+import runpod; \
+from mimicmotion.utils.loader import create_pipeline; \
+from mimicmotion.dwpose.preprocess import get_video_pose, get_image_pose; \
+from mimicmotion.dwpose.util import draw_pose; \
+print('>>> ALL DEPENDENCIES & SUBMODULES VERIFIED SUCCESSFULLY <<<')"
 
-# 7. Copy serverless handler
+# 7. Copy handler
 COPY handler.py /app/MimicMotion/handler.py
 
 ENV PYTHONPATH=/app/MimicMotion
