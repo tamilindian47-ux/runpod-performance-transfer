@@ -11,20 +11,22 @@ from PIL import Image
 from mimicmotion.utils.loader import create_pipeline
 from mimicmotion.pipelines.pipeline_mimicmotion import MimicMotionPipeline
 from mimicmotion.dwpose.preprocess import get_video_pose, get_image_pose
-from torchvision.transforms.functional import to_pil_image
 from mimicmotion.utils.utils import save_to_mp4
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BASE_DIR = "/app/MimicMotion"
-SVD_PATH = "vdo/stable-video-diffusion-img2vid-xt-1-1"
+SVD_CKPT = os.path.join(BASE_DIR, "models/SVD/diffusion_pytorch_model.fp16.safetensors")
 CKPT_PATH = os.path.join(BASE_DIR, "models/MimicMotion_1-1.pth")
 
 print("Initializing MimicMotion Pipeline...", flush=True)
-pipeline = create_pipeline(
-    base_model_path=SVD_PATH,
-    ckpt_path=CKPT_PATH,
-    device=DEVICE
-)
+
+# Build configuration structure expected by MimicMotion
+infer_config = OmegaConf.create({
+    "base_model_path": SVD_CKPT,
+    "ckpt_path": CKPT_PATH
+})
+
+pipeline = create_pipeline(infer_config, device=DEVICE)
 print("Pipeline loaded successfully.", flush=True)
 
 def download_file(url_or_b64, target_path):
@@ -42,7 +44,7 @@ def download_file(url_or_b64, target_path):
 def handler(job):
     job_input = job.get("input", {})
     
-    # 1. Input parameters
+    # 1. Inputs: reference image and motion video
     ref_image_src = job_input.get("ref_image")
     ref_video_src = job_input.get("ref_video")
     
@@ -64,11 +66,11 @@ def handler(job):
     out_path = os.path.join(work_dir, "output.mp4")
     
     try:
-        # 2. Download/decode inputs
+        # 2. Save incoming inputs
         download_file(ref_image_src, img_path)
         download_file(ref_video_src, vid_path)
         
-        # 3. Preprocess poses
+        # 3. Process image and video motion skeletons
         image_pixels = Image.open(img_path).convert("RGB")
         w, h = image_pixels.size
         scale = resolution / min(h, w)
@@ -78,14 +80,7 @@ def handler(job):
         video_pose = get_video_pose(vid_path, image_pixels, sample_stride=sample_stride)
         pose_pixels = torch.from_numpy(video_pose).to(DEVICE)
         
-        # 4. Generate video
-        cfg = OmegaConf.create({
-            "num_inference_steps": num_inference_steps,
-            "guidance_scale": guidance_scale,
-            "noise_aug_strength": 0.0,
-            "fps": fps
-        })
-        
+        # 4. Generate animated frames
         with torch.no_grad():
             frames = pipeline(
                 image=image_pixels,
@@ -112,7 +107,7 @@ def handler(job):
     except Exception as e:
         return {"error": str(e)}
     finally:
-        # Clean temporary worker files
+        # 5. Clean up temporary working directory
         if os.path.exists(work_dir):
             os.system(f"rm -rf {work_dir}")
 
