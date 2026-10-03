@@ -36,7 +36,9 @@ RUN mkdir -p models/DWPose && \
 RUN wget -q https://huggingface.co/tencent/MimicMotion/resolve/main/MimicMotion_1-1.pth -O models/MimicMotion_1-1.pth
 
 # 5. Pre-cache SVD base weights into the image (~3.1GB) so worker starts instantly
-RUN python -c "from diffusers import StableVideoDiffusionPipeline; StableVideoDiffusionPipeline.from_pretrained('stabilityai/stable-video-diffusion-img2vid-xt-1-1', torch_dtype=None)"
+RUN python -c "from diffusers import StableVideoDiffusionPipeline; StableVideoDiffusionPipeline.from_pretrained('vdo/stable-video-diffusion-img2vid-xt-1-1', torch_dtype=None)"
+
+
 
 # 6. Copy serverless handler
 COPY handler.py /app/MimicMotion/handler.py
