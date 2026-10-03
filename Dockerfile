@@ -22,7 +22,7 @@ WORKDIR /app/MimicMotion
 
 # 2. Build the environment using MimicMotion's official environment specification
 RUN conda env update -n base -f environment.yaml && \
-    pip install --no-cache-dir runpod requests
+    pip install --no-cache-dir runpod requests matplotlib
 
 # 3. Download DWPose weights (~300MB total)
 RUN mkdir -p models/DWPose && \
