@@ -16,7 +16,7 @@ from mimicmotion.utils.utils import save_to_mp4
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BASE_DIR = "/app/MimicMotion"
-SVD_PATH = "stabilityai/stable-video-diffusion-img2vid-xt-1-1"
+SVD_PATH = "vdo/stable-video-diffusion-img2vid-xt-1-1"
 CKPT_PATH = os.path.join(BASE_DIR, "models/MimicMotion_1-1.pth")
 
 print("Initializing MimicMotion Pipeline...", flush=True)
