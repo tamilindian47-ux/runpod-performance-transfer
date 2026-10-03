@@ -1,8 +1,7 @@
 FROM pytorch/pytorch:2.1.2-cuda12.1-cudnn8-devel
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
@@ -19,11 +18,11 @@ WORKDIR /app
 # 1. Clone MimicMotion repository
 RUN git clone https://github.com/Tencent/MimicMotion.git /app/MimicMotion
 
-# 2. Install strictly pinned Python packages
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
-
 WORKDIR /app/MimicMotion
+
+# 2. Build the environment using MimicMotion's official environment specification
+RUN conda env update -n base -f environment.yaml && \
+    pip install --no-cache-dir runpod requests
 
 # 3. Download DWPose weights (~300MB total)
 RUN mkdir -p models/DWPose && \
@@ -37,10 +36,10 @@ RUN wget -q https://huggingface.co/tencent/MimicMotion/resolve/main/MimicMotion_
 RUN mkdir -p models/SVD && \
     wget -q https://huggingface.co/vdo/stable-video-diffusion-img2vid-xt-1-1/resolve/main/unet/diffusion_pytorch_model.fp16.safetensors -O models/SVD/diffusion_pytorch_model.fp16.safetensors
 
-# 6. Verify critical imports inside the build so it never fails silently at runtime
-RUN python -c "import numpy; assert numpy.__version__.startswith('1.26'); import torch; import diffusers; import huggingface_hub; from huggingface_hub import cached_download; print('All imports verified successfully!')"
+# 6. Verify pipeline imports inside the build stage
+RUN python -c "import numpy; import torch; from mimicmotion.utils.loader import create_pipeline; print('Environment and imports verified successfully!')"
 
-# 7. Copy handler
+# 7. Copy serverless handler
 COPY handler.py /app/MimicMotion/handler.py
 
 ENV PYTHONPATH=/app/MimicMotion
