@@ -2,8 +2,7 @@ FROM pytorch/pytorch:2.1.2-cuda12.1-cudnn8-devel
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    HF_HUB_ENABLE_HF_TRANSFER=0
+    PIP_NO_CACHE_DIR=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
@@ -20,10 +19,9 @@ WORKDIR /app
 # 1. Clone MimicMotion repository
 RUN git clone https://github.com/Tencent/MimicMotion.git /app/MimicMotion
 
-# 2. Install dependencies
+# 2. Install strictly pinned Python packages
 COPY requirements.txt /app/requirements.txt
-RUN pip install --upgrade pip && \
-    pip install -r /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 WORKDIR /app/MimicMotion
 
@@ -39,7 +37,10 @@ RUN wget -q https://huggingface.co/tencent/MimicMotion/resolve/main/MimicMotion_
 RUN mkdir -p models/SVD && \
     wget -q https://huggingface.co/vdo/stable-video-diffusion-img2vid-xt-1-1/resolve/main/unet/diffusion_pytorch_model.fp16.safetensors -O models/SVD/diffusion_pytorch_model.fp16.safetensors
 
-# 6. Copy serverless handler
+# 6. Verify critical imports inside the build so it never fails silently at runtime
+RUN python -c "import numpy; assert numpy.__version__.startswith('1.26'); import torch; import diffusers; import huggingface_hub; from huggingface_hub import cached_download; print('All imports verified successfully!')"
+
+# 7. Copy handler
 COPY handler.py /app/MimicMotion/handler.py
 
 ENV PYTHONPATH=/app/MimicMotion
